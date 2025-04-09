@@ -1,0 +1,13 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-binding
+  namespace: luis-bruckner-dev
+spec:
+  params:
+    - name: git-repo-application
+      value: $(body.repository.clone_url)
+    - name: git-repo-gitops
+      value: "https://github.com/marcelobruckner/hello-gitops-openshift"
+    - name: image
+      value: "marcelobruckner/hello"

@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-openshift
+  namespace: luis-bruckner-dev
+spec:
+  description: "Aplica os manifests diretamente no OpenShift após atualizar o repositório GitOps"
+  workspaces:
+    - name: manifests
+      description: "Workspace contendo os manifests do GitOps"
+  steps:
+    # - name: debug-workspace
+    #   image: alpine
+    #   script: |
+    #     #!/bin/sh
+    #     echo "📁 Diretório atual:"
+    #     pwd
+    #     echo "📂 Listando /workspace:"
+    #     ls -la /workspace
+    #     echo "📂 Listando /workspace/manifests:"
+    #     ls -la /workspace/manifests
+    #     echo "📂 Listando tudo com tree:"
+    #     apk add --no-cache tree
+    #     tree /workspace
+
+    - name: oc-apply
+      image: quay.io/openshift/origin-cli:latest
+      script: |
+        #!/bin/sh
+        echo "Deploying app to OpenShift (DEV) from updated GitOps repo..."
+        oc apply -k /workspace/manifests/repo/gitops/

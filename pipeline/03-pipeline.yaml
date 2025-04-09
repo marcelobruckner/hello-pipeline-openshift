@@ -1,0 +1,123 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: hello-pipeline
+  namespace: luis-bruckner-dev # Certifique-se de usar o namespace correto
+spec:
+  description: A pipeline that clones a git repository, build image, update mainfest and commits changes.
+  params:
+    - name: git-repo-application
+      type: string
+      description: The git repo URL to clone from.
+      default: "https://github.com/marcelobruckner/hello-app"
+
+    - name: git-repo-gitops
+      type: string
+      description: The git repo gitpos to update manifests.
+      default: "https://github.com/marcelobruckner/hello-gitops-openshift"
+
+    - name: image
+      type: string
+      description: The image name to build.
+      default: "marcelobruckner/hello"
+
+    - name: dockerfile
+      type: string
+      description: The path to the Dockerfile.
+      default: "./Dockerfile"
+
+    - name: context
+      type: string
+      description: The path to the build context.
+      default: "."
+  workspaces:
+    - name: shared-data
+      description: |
+        This workspace contains the cloned repo files, so they can be read by the
+        next task.
+    - name: gitops-shared-data
+      description: |
+        This workspace contains the cloned repo files, so they can be read by the
+        next task for gitops.
+    - name: dockerconfig
+      description: |
+        This workspace is used to mount Docker config secret to authenticate with registry.
+
+  tasks:
+    # Fetch the source code from the git repository.
+    - name: fetch-source
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: "$(params.git-repo-application)"
+        - name: deleteExisting
+          value: "true"
+        - name: submodules
+          value: "false"
+
+    - name: get-git-sha
+      runAfter:
+        - fetch-source
+      taskRef:
+        name: get-git-sha
+      workspaces:
+        - name: source
+          workspace: shared-data
+
+    # Builds the image using Kaniko.
+    - name: build-image
+      taskRef:
+        name: kaniko
+      runAfter:
+        - get-git-sha
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: dockerconfig
+          workspace: dockerconfig
+      params:
+        - name: IMAGE
+          value: "docker.io/$(params.image):$(tasks.get-git-sha.results.commit-sha)"
+        - name: DOCKERFILE
+          value: "$(params.dockerfile)"
+        - name: CONTEXT
+          value: "$(params.context)"
+
+    # Updates the image in the kustomization.yaml file.
+    - name: update-commit-mainfest
+      runAfter:
+        - build-image
+      taskRef:
+        name: update-commit-mainfest
+      workspaces:
+        - name: source-gitops
+          workspace: gitops-shared-data
+      params:
+        - name: GIT_REPO_GITOPS
+          value: $(params.git-repo-gitops)
+        - name: GIT_BRANCH
+          value: "main"
+        - name: GIT_USER_NAME
+          value: "Pipeline Bot"
+        - name: GIT_USER_EMAIL
+          value: "pipeline@tekton.com"
+        - name: IMAGE
+          value: "$(params.image)"
+        - name: DIGEST
+          value: "$(tasks.get-git-sha.results.commit-sha)"
+        - name: KUSTOMIZE_PATH
+          value: "gitops"
+
+      # Aplica os manifests no OpenShift (ambiente DEV)
+    - name: deploy-to-dev
+      taskRef:
+        name: deploy-openshift
+      runAfter:
+        - update-commit-mainfest
+      workspaces:
+        - name: manifests
+          workspace: gitops-shared-data

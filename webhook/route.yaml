@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: el-hello
+  namespace: luis-bruckner-dev
+spec:
+  to:
+    kind: Service
+    name: el-hello-event-listener
+  port:
+    targetPort: http-listener
+  tls:
+    termination: edge

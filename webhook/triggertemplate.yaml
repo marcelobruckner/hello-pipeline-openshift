@@ -1,0 +1,39 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: hello-pipeline-template
+  namespace: luis-bruckner-dev
+spec:
+  params:
+    - name: git-repo-application
+    - name: git-repo-gitops
+    - name: image
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: hello-pipeline-run-
+        namespace: luis-bruckner-dev
+      spec:
+        pipelineRef:
+          name: hello-pipeline
+        params:
+          - name: git-repo-application
+            value: $(tt.params.git-repo-application)
+          - name: git-repo-gitops
+            value: $(tt.params.git-repo-gitops)
+          - name: image
+            value: $(tt.params.image)
+        workspaces:
+          - name: shared-data
+            persistentVolumeClaim:
+              claimName: hello-pvc
+          - name: gitops-shared-data
+            persistentVolumeClaim:
+              claimName: hello-gitops-pvc
+          - name: dockerconfig
+            secret:
+              secretName: dockerhub-secret-2
+              items:
+                - key: .dockerconfigjson
+                  path: config.json

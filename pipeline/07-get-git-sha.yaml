@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: get-git-sha
+  namespace: luis-bruckner-dev # ajuste se necessário
+spec:
+  workspaces:
+    - name: source
+      description: O workspace onde o repositório foi clonado.
+  results:
+    - name: commit-sha
+      description: O SHA do último commit do repositório.
+  steps:
+    - name: extract-sha
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        git config --global --add safe.directory /workspace/source
+        cd $(workspaces.source.path)
+        sha=$(git rev-parse --short HEAD)
+        echo "Commit SHA: $sha"
+        echo -n "$sha" > $(results.commit-sha.path)

@@ -1,0 +1,114 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-commit-mainfest
+  namespace: luis-bruckner-dev # Certifique-se de usar o namespace correto
+  labels:
+    app.kubernetes.io/version: "1.0"
+  annotations:
+    tekton.dev/categories: Deployment
+    tekton.dev/tags: kustomize, kubernetes
+    tekton.dev/displayName: update-commit-manifest
+spec:
+  description: >
+    Atualiza manifestos Kubernetes com Kustomize, alterando a imagem para um novo SHA ou tag.
+    Comita e envia para o GitHub as alterações feitas nos manifestos Kubernetes.
+
+  params:
+    - name: GIT_REPO_GITOPS
+      description: "URL do repositório Git"
+      # default: "https://github.com/marcelobruckner/hello-app"
+
+    - name: GIT_BRANCH
+      description: "Branch para onde enviar as alterações"
+      # default: "main"
+
+    - name: GIT_USER_NAME
+      description: "Nome do usuário do Git"
+      # default: "Openshift Bot"
+
+    - name: GIT_USER_EMAIL
+      description: "E-mail do usuário do Git"
+
+    - name: DIGEST
+      description: "SHA da imagem a ser atualizada no Kustomize (ex: sha256:abcd123)"
+
+    - name: IMAGE
+      description: "aqui entra o registry. ex: docker.io/marcelobruckner/hello"
+
+    - name: KUSTOMIZE_PATH
+      description: "Caminho onde está o kustomization.yaml"
+      # default: "."
+
+  workspaces:
+    - name: source-gitops
+      description: "Workspace contendo os arquivos do Kustomize"
+
+  steps:
+    - name: git-clone-repository-gitops
+      image: alpine/git:latest
+      workingDir: $(workspaces.source-gitops.path)
+      script: |
+        #!/bin/sh
+        set -e
+
+        echo "🔄 Git-clone do repo $(params.GIT_REPO_GITOPS) na branch $(params.GIT_BRANCH)"
+        echo "📁 Diretório atual: $(pwd)"
+
+        # ls -la
+
+        if [ -d "repo" ]; then
+          echo "🧹 Diretório 'repo' já existe. Removendo..."
+          rm -rf repo
+        fi
+
+        git clone $(params.GIT_REPO_GITOPS) -b $(params.GIT_BRANCH) --single-branch --depth 1 repo
+
+    - name: update-manifest-with-kustomize
+      image: registry.k8s.io/kustomize/kustomize:v5.0.0
+      workingDir: $(workspaces.source-gitops.path)/repo/gitops
+      script: |
+        #!/bin/sh
+        set -e
+
+        echo "📂 Diretório atual antes do cd: $(pwd)"
+        cd $(workspaces.source-gitops.path)/repo/$(params.KUSTOMIZE_PATH)
+
+        echo "📂 Diretório após cd: $(pwd)"
+        echo "🔍 Verificando existência de kustomization.yaml..."
+        ls -la
+
+        echo "🔄 Atualizando imagem no Kustomize..."
+        kustomize edit set image $(params.IMAGE)=$(params.IMAGE):$(params.DIGEST)
+
+        echo "✅ Kustomization atualizado com sucesso!"
+        cat kustomization.yaml
+
+    - name: git-commit-manifest-gitops
+      image: alpine/git:latest
+      workingDir: $(workspaces.source-gitops.path)/repo
+      script: |
+        #!/bin/sh
+        set -e
+
+        echo "🔧 Configurando Git..."
+
+        echo "📂 Diretório atual antes do cd: $(pwd)"
+        cd $(workspaces.source-gitops.path)/repo
+
+        echo "📂 Diretório após cd: $(pwd)"
+
+        ls -la
+
+        git status
+        git config user.name "$(params.GIT_USER_NAME)"
+        git config user.email "$(params.GIT_USER_EMAIL)"
+
+        # echo "➕ Adicionando alterações..."
+        git add .
+
+        # echo "📦 Commitando alterações..."
+        git commit -m "Atualiza manifest com nova imagem: $(params.IMAGE)@$(params.DIGEST)" || echo "Nenhuma alteração para commit."
+
+        # echo "🚀 Enviando para o repositório remoto..."
+        git push origin $(params.GIT_BRANCH)
