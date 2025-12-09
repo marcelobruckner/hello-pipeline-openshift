@@ -116,7 +116,7 @@ spec:
       envFrom:
         - secretRef:
             name: github-token
-      workingDir: $(workspaces.source-gitops.path)/repo
+      workingDir: $(workspaces.source-gitops.path)
       script: |
         #!/bin/sh
         set -e
@@ -142,6 +142,12 @@ spec:
         echo "🔧 Configurando Git..."
 
         echo "📂 Diretório atual antes do cd: $(pwd)"
+        if [ ! -d "$(workspaces.source-gitops.path)/repo" ]; then
+          echo "❌ Diretório do repo não encontrado em $(workspaces.source-gitops.path)/repo"
+          ls -la $(workspaces.source-gitops.path)
+          exit 1
+        fi
+
         cd $(workspaces.source-gitops.path)/repo
 
         echo "📂 Diretório após cd: $(pwd)"
