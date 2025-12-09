@@ -113,11 +113,11 @@ spec:
           value: "gitops"
 
       # Aplica os manifests no OpenShift (ambiente DEV)
-    - name: deploy-to-dev
-      taskRef:
-        name: deploy-openshift
-      runAfter:
-        - update-commit-mainfest
-      workspaces:
-        - name: manifests
-          workspace: gitops-shared-data
+    # - name: deploy-to-dev
+    #   taskRef:
+    #     name: deploy-openshift
+    #   runAfter:
+    #     - update-commit-mainfest
+    #   workspaces:
+    #     - name: manifests
+    #       workspace: gitops-shared-data
