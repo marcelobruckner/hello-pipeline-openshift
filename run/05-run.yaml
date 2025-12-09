@@ -10,12 +10,10 @@ spec:
 
   workspaces:
     - name: shared-data
-      persistentVolumeClaim:
-        claimName: hello-pvc
+      emptyDir: {}
 
     - name: gitops-shared-data
-      persistentVolumeClaim:
-        claimName: hello-gitops-pvc
+      emptyDir: {}
 
     - name: dockerconfig
       secret:
