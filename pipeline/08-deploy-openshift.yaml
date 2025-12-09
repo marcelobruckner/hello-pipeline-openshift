@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: deploy-openshift
-  namespace: luis-bruckner-dev
+  namespace: hello-pipeline
 spec:
   description: "Aplica os manifests diretamente no OpenShift após atualizar o repositório GitOps"
   workspaces:

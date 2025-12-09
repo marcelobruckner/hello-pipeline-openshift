@@ -2,7 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: el-hello
-  namespace: luis-bruckner-dev
+  namespace: hello-pipeline
 spec:
   to:
     kind: Service

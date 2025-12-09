@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: hello-pipeline-template
-  namespace: luis-bruckner-dev
+  namespace: hello-pipeline
 spec:
   params:
     - name: git-repo-application
@@ -13,7 +13,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: hello-pipeline-run-
-        namespace: luis-bruckner-dev
+        namespace: hello-pipeline
       spec:
         pipelineRef:
           name: hello-pipeline

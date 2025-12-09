@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerBinding
 metadata:
   name: github-binding
-  namespace: luis-bruckner-dev
+  namespace: hello-pipeline
 spec:
   params:
     - name: git-repo-application

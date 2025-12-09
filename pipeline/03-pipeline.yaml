@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: hello-pipeline
-  namespace: luis-bruckner-dev # Certifique-se de usar o namespace correto
+  namespace: hello-pipeline # Certifique-se de usar o namespace correto
 spec:
   description: A pipeline that clones a git repository, build image, update mainfest and commits changes.
   params:

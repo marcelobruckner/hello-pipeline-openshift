@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
   generateName: hello-pipeline-run-
-  namespace: luis-bruckner-dev # Certifique-se de usar o namespace correto
+  namespace: hello-pipeline # Certifique-se de usar o namespace correto
 spec:
   pipelineRef:
     name: hello-pipeline

@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: get-git-sha
-  namespace: luis-bruckner-dev # ajuste se necessário
+  namespace: hello-pipeline # ajuste se necessário
 spec:
   workspaces:
     - name: source

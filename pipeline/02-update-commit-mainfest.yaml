@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: update-commit-mainfest
-  namespace: luis-bruckner-dev # Certifique-se de usar o namespace correto
+  namespace: hello-pipeline # Certifique-se de usar o namespace correto
   labels:
     app.kubernetes.io/version: "1.0"
   annotations:

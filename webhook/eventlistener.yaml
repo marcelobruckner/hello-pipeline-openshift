@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: hello-event-listener
-  namespace: luis-bruckner-dev
+  namespace: hello-pipeline
 spec:
   serviceAccountName: pipeline
   triggers:
