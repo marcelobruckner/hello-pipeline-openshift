@@ -23,6 +23,18 @@ Este projeto fornece uma configuração de pipeline para implantação contínua
 - **Openshift Pipelines**: Operador Openshift Pipelines instalado no cluster OpenShift.
 - **Repositório GitHub**: Repositório da sua aplicação com permissões para configurar webhooks.
 
+## 🔐 Credenciais do GitHub
+
+1. Gere um Personal Access Token no GitHub (permite `repo` para push) e defina também o usuário que fará os commits.
+2. Edite `pipeline/09-secret-github-token.yaml`, preenchendo `username` e `password` com as credenciais do bot/usuário.
+3. Aplique o secret no namespace da pipeline:
+
+   ```bash
+   oc apply -f pipeline/09-secret-github-token.yaml
+   ```
+
+O ServiceAccount `hello-sa` já referencia este secret; as tasks vão usar as credenciais automaticamente para `git clone` e `git push`.
+
 ## 📋 Tasks Utilizadas na Pipeline
 
 #### ✅ Tasks Oficiais (do Tekton Hub)

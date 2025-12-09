@@ -47,10 +47,23 @@ spec:
   steps:
     - name: git-clone-repository-gitops
       image: alpine/git:latest
+      env:
+        - name: HOME
+          value: /tekton/home
       workingDir: $(workspaces.source-gitops.path)
       script: |
         #!/bin/sh
         set -e
+
+        mkdir -p "$HOME"
+
+        if [ -f /tekton/creds/.git-credentials ]; then
+          echo "🔐 Configurando helper de credenciais do Git"
+          cp /tekton/creds/.git-credentials "$HOME/.git-credentials"
+          git config --global credential.helper store
+        else
+          echo "⚠️  Nenhum arquivo de credencial encontrado em /tekton/creds/.git-credentials"
+        fi
 
         echo "🔄 Git-clone do repo $(params.GIT_REPO_GITOPS) na branch $(params.GIT_BRANCH)"
         echo "📁 Diretório atual: $(pwd)"
@@ -86,10 +99,23 @@ spec:
 
     - name: git-commit-manifest-gitops
       image: alpine/git:latest
+      env:
+        - name: HOME
+          value: /tekton/home
       workingDir: $(workspaces.source-gitops.path)/repo
       script: |
         #!/bin/sh
         set -e
+
+        mkdir -p "$HOME"
+
+        if [ -f /tekton/creds/.git-credentials ]; then
+          echo "🔐 Configurando helper de credenciais do Git"
+          cp /tekton/creds/.git-credentials "$HOME/.git-credentials"
+          git config --global credential.helper store
+        else
+          echo "⚠️  Nenhum arquivo de credencial encontrado em /tekton/creds/.git-credentials"
+        fi
 
         echo "🔧 Configurando Git..."
 
