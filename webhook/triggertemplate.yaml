@@ -15,6 +15,7 @@ spec:
         generateName: hello-pipeline-run-
         namespace: hello-pipeline
       spec:
+        serviceAccountName: hello-sa
         pipelineRef:
           name: hello-pipeline
         params:

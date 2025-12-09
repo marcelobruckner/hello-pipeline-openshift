@@ -4,6 +4,7 @@ metadata:
   generateName: hello-pipeline-run-
   namespace: hello-pipeline # Certifique-se de usar o namespace correto
 spec:
+  serviceAccountName: hello-sa
   pipelineRef:
     name: hello-pipeline
 
