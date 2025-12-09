@@ -10,10 +10,22 @@ spec:
 
   workspaces:
     - name: shared-data
-      emptyDir: {}
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
 
     - name: gitops-shared-data
-      emptyDir: {}
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
 
     - name: dockerconfig
       secret:

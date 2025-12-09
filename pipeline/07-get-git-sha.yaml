@@ -15,8 +15,8 @@ spec:
       image: alpine/git
       script: |
         #!/bin/sh
-        git config --global --add safe.directory /workspace/source
         cd $(workspaces.source.path)
+        git config --global --add safe.directory $(workspaces.source.path)
         sha=$(git rev-parse --short HEAD)
         echo "Commit SHA: $sha"
         echo -n "$sha" > $(results.commit-sha.path)
