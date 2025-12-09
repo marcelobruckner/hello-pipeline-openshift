@@ -50,6 +50,9 @@ spec:
       env:
         - name: HOME
           value: /tekton/home
+      envFrom:
+        - secretRef:
+            name: github-token
       workingDir: $(workspaces.source-gitops.path)
       script: |
         #!/bin/sh
@@ -58,11 +61,15 @@ spec:
         mkdir -p "$HOME"
 
         if [ -f /tekton/creds/.git-credentials ]; then
-          echo "🔐 Configurando helper de credenciais do Git"
+          echo "🔐 Configurando helper de credenciais do Git a partir de /tekton/creds"
           cp /tekton/creds/.git-credentials "$HOME/.git-credentials"
-          git config --global credential.helper store
+          git config --global credential.helper "store --file=$HOME/.git-credentials"
+        elif [ -n "$username" ] && [ -n "$password" ]; then
+          echo "🔐 Configurando helper de credenciais usando variáveis do secret github-token"
+          printf "https://%s:%s@github.com\n" "$username" "$password" > "$HOME/.git-credentials"
+          git config --global credential.helper "store --file=$HOME/.git-credentials"
         else
-          echo "⚠️  Nenhum arquivo de credencial encontrado em /tekton/creds/.git-credentials"
+          echo "⚠️  Nenhuma credencial encontrada. Verifique o secret github-token e a anotação tekton.dev/git-0."
         fi
 
         echo "🔄 Git-clone do repo $(params.GIT_REPO_GITOPS) na branch $(params.GIT_BRANCH)"
@@ -102,6 +109,9 @@ spec:
       env:
         - name: HOME
           value: /tekton/home
+      envFrom:
+        - secretRef:
+            name: github-token
       workingDir: $(workspaces.source-gitops.path)/repo
       script: |
         #!/bin/sh
@@ -110,11 +120,15 @@ spec:
         mkdir -p "$HOME"
 
         if [ -f /tekton/creds/.git-credentials ]; then
-          echo "🔐 Configurando helper de credenciais do Git"
+          echo "🔐 Configurando helper de credenciais do Git a partir de /tekton/creds"
           cp /tekton/creds/.git-credentials "$HOME/.git-credentials"
-          git config --global credential.helper store
+          git config --global credential.helper "store --file=$HOME/.git-credentials"
+        elif [ -n "$username" ] && [ -n "$password" ]; then
+          echo "🔐 Configurando helper de credenciais usando variáveis do secret github-token"
+          printf "https://%s:%s@github.com\n" "$username" "$password" > "$HOME/.git-credentials"
+          git config --global credential.helper "store --file=$HOME/.git-credentials"
         else
-          echo "⚠️  Nenhum arquivo de credencial encontrado em /tekton/creds/.git-credentials"
+          echo "⚠️  Nenhuma credencial encontrada. Verifique o secret github-token e a anotação tekton.dev/git-0."
         fi
 
         echo "🔧 Configurando Git..."
