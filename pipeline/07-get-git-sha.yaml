@@ -1,22 +1,29 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: get-git-sha
-  namespace: hello-pipeline # ajuste se necessário
+  namespace: hello-pipeline
 spec:
   workspaces:
     - name: source
-      description: O workspace onde o repositório foi clonado.
+      description: Workspace containing the cloned repository.
   results:
     - name: commit-sha
-      description: O SHA do último commit do repositório.
+      description: Short SHA of the latest commit.
   steps:
     - name: extract-sha
       image: alpine/git
+      securityContext:
+        runAsUser: 65532
+      env:
+        - name: HOME
+          value: /tekton/home
       script: |
         #!/bin/sh
-        cd $(workspaces.source.path)
-        git config --global --add safe.directory $(workspaces.source.path)
+        set -eu
+        mkdir -p "$HOME"
+        cd "$(workspaces.source.path)"
+        git config --global --add safe.directory "$(workspaces.source.path)"
         sha=$(git rev-parse --short HEAD)
-        echo "Commit SHA: $sha"
-        echo -n "$sha" > $(results.commit-sha.path)
+        printf 'Commit SHA: %s\n' "$sha"
+        printf '%s' "$sha" > "$(results.commit-sha.path)"

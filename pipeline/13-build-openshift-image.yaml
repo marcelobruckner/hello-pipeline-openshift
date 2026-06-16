@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-openshift-image
+  namespace: hello-pipeline
+spec:
+  description: Start an OpenShift binary build and publish the resulting immutable image reference.
+  params:
+    - name: NAMESPACE
+      type: string
+      default: hello-pipeline
+    - name: BUILD_CONFIG
+      type: string
+      default: hello-build
+    - name: IMAGE_STREAM
+      type: string
+      default: hello
+    - name: IMAGE_TAG
+      type: string
+      default: latest
+    - name: CONTEXT
+      type: string
+      default: .
+  workspaces:
+    - name: source
+      description: Workspace containing the application source.
+  results:
+    - name: IMAGE_URL
+      description: Repository URL used for the image.
+    - name: IMAGE_DIGEST
+      description: Immutable digest resolved after the build.
+  steps:
+    - name: start-build
+      image: quay.io/openshift/origin-cli:latest
+      securityContext:
+        runAsUser: 65532
+      env:
+        - name: HOME
+          value: /tekton/home
+      script: |
+        #!/bin/sh
+        set -eu
+
+        mkdir -p "$HOME"
+        NAMESPACE="$(params.NAMESPACE)"
+        REPOSITORY="image-registry.openshift-image-registry.svc:5000/$NAMESPACE/$(params.IMAGE_STREAM)"
+
+        oc login           --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"           --server=https://kubernetes.default.svc           --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt >/dev/null
+
+        BUILD_NAME="$(oc start-build "$(params.BUILD_CONFIG)"           -n "$NAMESPACE"           --from-dir="$(workspaces.source.path)/$(params.CONTEXT)"           -o name)"
+
+        oc wait "$BUILD_NAME" --for=condition=Complete --timeout=30m
+        oc tag -n "$NAMESPACE" "$(params.IMAGE_STREAM):latest" "$(params.IMAGE_STREAM):$(params.IMAGE_TAG)"
+
+        IMAGE_DIGEST="$(oc get istag -n "$NAMESPACE" "$(params.IMAGE_STREAM):$(params.IMAGE_TAG)" -o jsonpath='{.image.dockerImageReference}' 2>/dev/null || true)"
+        if [ -z "$IMAGE_DIGEST" ]; then
+          echo "Unable to resolve immutable image digest" >&2
+          exit 1
+        fi
+
+        printf '%s\n' "$REPOSITORY" | tee "$(results.IMAGE_URL.path)"
+        printf '%s\n' "$IMAGE_DIGEST" | tee "$(results.IMAGE_DIGEST.path)"

@@ -80,8 +80,12 @@ spec:
   steps:
     - name: build-and-push
       image: $(params.BUILDER_IMAGE)
+      securityContext:
+        runAsUser: 65532
       workingDir: $(workspaces.source.path)
       env:
+        - name: HOME
+          value: /tekton/home
         - name: PARAM_IMAGE
           value: $(params.IMAGE)
         - name: PARAM_STORAGE_DRIVER
@@ -115,6 +119,8 @@ spec:
         done
         [ "$(workspaces.sslcertdir.bound)" = "true" ] && CERT_DIR_FLAG="--cert-dir=$(workspaces.sslcertdir.path)"
         [ "$(workspaces.dockerconfig.bound)" = "true" ] && DOCKER_CONFIG="$(workspaces.dockerconfig.path)" && export DOCKER_CONFIG
+        mkdir -p "$HOME/.config/containers"
+        printf '%s\n' 'unqualified-search-registries = ["docker.io"]' 'short-name-mode = "permissive"' > "$HOME/.config/containers/registries.conf"
         # build the image (CERT_DIR_FLAG should be omitted if empty and BUILD_EXTRA_ARGS can contain multiple args)
         # shellcheck disable=SC2046,SC2086
 

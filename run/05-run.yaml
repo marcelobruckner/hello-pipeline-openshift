@@ -1,13 +1,23 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: hello-pipeline-run-
-  namespace: hello-pipeline # Certifique-se de usar o namespace correto
+  namespace: hello-pipeline
 spec:
   serviceAccountName: hello-sa
   pipelineRef:
     name: hello-pipeline
-
+  timeouts:
+    pipeline: 1h0m0s
+  podTemplate:
+    securityContext:
+      fsGroup: 65532
+      runAsUser: 65532
+  params:
+    - name: git-repo-application
+      value: "https://github.com/marcelobruckner/hello-app"
+    - name: context
+      value: "."
   workspaces:
     - name: shared-data
       volumeClaimTemplate:
@@ -17,16 +27,3 @@ spec:
           resources:
             requests:
               storage: 1Gi
-
-    - name: gitops-shared-data
-      volumeClaimTemplate:
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
-
-    - name: dockerconfig
-      secret:
-        secretName: dockerhub-secret-2

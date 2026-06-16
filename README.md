@@ -1,86 +1,77 @@
 # Hello Pipeline OpenShift
 
-Este projeto fornece uma configuração de pipeline para implantação contínua de aplicações no OpenShift, utilizando Openshift Pipelines (Tekton) e integração via webhooks do GitHub.
+This project provides a simple CI/CD pipeline for OpenShift with a production-style flow: clone the app, build an immutable image in OpenShift, and deploy it directly to the cluster. GitOps is intentionally deferred to a later phase.
 
-## 📂 Estrutura do Repositório
+## Repository Layout
 
-- **pipeline/**: Contém os manifests YAML para a configuração da pipeline Tekton.
-- **run/**: Scripts ou arquivos necessários para a execução da pipeline.
-- **webhook/**: Configurações relacionadas à integração com webhooks do GitHub.
-- **.gitignore**: Lista de arquivos e diretórios a serem ignorados pelo Git.
-- **LICENSE**: Licença GPL-3.0 que rege este projeto.
-- **README.md**: Este arquivo, fornecendo informações sobre o projeto.
+- **pipeline/**: Tekton pipeline and task manifests.
+- **run/**: A manual `PipelineRun` example for the current flow.
+- **webhook/**: Kept for the future GitOps/webhook phase.
+- **README.md**: Project overview and setup instructions.
 
-## 🛠️ Tecnologias Utilizadas
+## Current Flow
 
-- **OpenShift**: Plataforma de orquestração de containers baseada em Kubernetes.
-- **Openshift Pipelines**: Framework nativo de Kubernetes para criação de pipelines CI/CD.
-- **GitHub Webhooks**: Mecanismo para integrar eventos do GitHub com serviços externos.
+1. Clone the application repository.
+2. Extract the short Git SHA from the source tree.
+3. Build an image with OpenShift binary build and tag it in the internal registry.
+4. Deploy the image by immutable digest to OpenShift.
+5. Run a smoke test against the route.
 
-## ⚙️ Pré-requisitos
+## Technologies
 
-- **Cluster OpenShift**: Acesso a um cluster OpenShift configurado.
-- **Openshift Pipelines**: Operador Openshift Pipelines instalado no cluster OpenShift.
-- **Repositório GitHub**: Repositório da sua aplicação com permissões para configurar webhooks.
+- **OpenShift**
+- **Tekton Pipelines**
+- **OpenShift Builds / ImageStreams**
+- **OpenShift Routes**
 
-## 🔐 Credenciais do GitHub
+## OpenShift Local / CRC
 
-1. Gere um Personal Access Token no GitHub (permite `repo` para push) e defina também o usuário que fará os commits.
-2. Edite `pipeline/09-secret-github-token.yaml`, preenchendo `username` e `password` com as credenciais do bot/usuário.
-3. Aplique o secret no namespace da pipeline:
+- Use the `hello-pipeline` namespace.
+- The app is deployed directly in OpenShift for the current phase.
+- The deployment task waits for rollout and then runs a smoke test against the exposed route.
+- GitOps and GitHub webhook integration will be reintroduced later, after this base flow is stable.
 
-   ```bash
-   oc apply -f pipeline/09-secret-github-token.yaml
-   ```
+## Prerequisites
 
-O ServiceAccount `hello-sa` já referencia este secret; as tasks vão usar as credenciais automaticamente para `git clone` e `git push`.
+- An OpenShift cluster or OpenShift Local / CRC.
+- Tekton Pipelines installed.
+- Access to the GitHub repository that contains the application source.
 
-## 📋 Tasks Utilizadas na Pipeline
+## Install
 
-#### ✅ Tasks Oficiais (do Tekton Hub)
+```bash
+oc new-project hello-pipeline
+oc apply -f pipeline/06-serviceaccount.yaml
+oc apply -f pipeline/10-rbac-deploy.yaml
+oc apply -f pipeline/04-pvc.yaml
+oc apply -f pipeline/07-get-git-sha.yaml
+oc apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
+oc apply -f pipeline/11-image-stream.yaml
+oc apply -f pipeline/12-buildconfig.yaml
+oc apply -f pipeline/13-build-openshift-image.yaml
+oc apply -f pipeline/08-deploy-openshift.yaml
+oc apply -f pipeline/03-pipeline.yaml
+oc apply -f run/05-run.yaml
+```
 
-| Task        | Fonte                                                                   | Função                                                       |
-| ----------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `git-clone` | [tektoncd/task/git-clone](https://hub.tekton.dev/tekton/task/git-clone) | Clona o repositório da aplicação no workspace da pipeline.   |
-| `kaniko`    | [tektoncd/task/kaniko](https://hub.tekton.dev/tekton/task/kaniko)       | Constrói a imagem da aplicação e realiza push no Docker Hub. |
+## Manual Run
 
-#### 🛠️ Tasks Customizadas (definidas neste repositório)
+```bash
+oc create -f run/05-run.yaml -n hello-pipeline
+```
 
-| Task                     | Caminho no Repositório                                                                   | Função                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `update-kustomize-image` | [`pipeline/update-kustomize-image-task.yaml`](pipeline/update-kustomize-image-task.yaml) | Atualiza a imagem no `kustomization.yaml` do repositório GitOps. |
-| `git-commit-push`        | [`pipeline/git-commit-push-task.yaml`](pipeline/git-commit-push-task.yaml)               | Comita e realiza push das alterações no repositório GitOps.      |
+Then watch the run with:
 
-## 🚀 Configuração e Execução
+```bash
+oc get pipelinerun,taskrun,pod,build -n hello-pipeline
+```
 
-1. **Configurar Webhook no GitHub**:
+## Notes
 
-   - No repositório da sua aplicação no GitHub, vá em _Settings_ > _Webhooks_.
-   - Clique em _Add webhook_ e configure a URL do serviço receptor no OpenShift.
-   - Selecione os eventos que irão disparar a pipeline (por exemplo, _push_).
+- The application is deployed by immutable digest, not by a mutable tag.
+- The deploy task validates rollout and performs a smoke test against the route.
+- The GitOps task and webhook manifests remain in the repository for the next phase, but they are not part of the active pipeline.
 
-2. **Aplicar Manifests da Pipeline**:
+## License
 
-   ```bash
-   git clone https://github.com/marcelobruckner/hello-pipeline-openshift.git
-   cd hello-pipeline-openshift/pipeline
-   oc apply -f .
-   ```
-
-3. **Executar a Pipeline**:
-
-   - A pipeline será disparada automaticamente pelos eventos configurados no webhook.
-   - Para execução manual, utilize o Tekton CLI (`tkn`) ou a interface web do OpenShift.
-
-## 🔍 Monitoramento
-
-- Utilize o Tekton Dashboard para visualizar o progresso e logs das execuções da pipeline.
-- Verifique os logs dos pods no OpenShift para depuração em caso de falhas.
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.
-
-## 📄 Licença
-
-Este projeto está licenciado sob a Licença GPL-3.0. Consulte o arquivo [LICENSE](LICENSE) para mais detalhes.
+GPL-3.0

@@ -1,50 +1,23 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: hello-pipeline
-  namespace: hello-pipeline # Certifique-se de usar o namespace correto
+  namespace: hello-pipeline
 spec:
-  description: A pipeline that clones a git repository, build image, update mainfest and commits changes.
+  description: Clone the application, build an immutable image in OpenShift, and deploy it directly to the cluster.
   params:
     - name: git-repo-application
       type: string
-      description: The git repo URL to clone from.
+      description: Git repository URL for the application source.
       default: "https://github.com/marcelobruckner/hello-app"
-
-    - name: git-repo-gitops
-      type: string
-      description: The git repo gitpos to update manifests.
-      default: "https://github.com/marcelobruckner/hello-gitops-openshift"
-
-    - name: image
-      type: string
-      description: The image name to build.
-      default: "marcelobruckner/hello"
-
-    - name: dockerfile
-      type: string
-      description: The path to the Dockerfile.
-      default: "./Dockerfile"
-
     - name: context
       type: string
-      description: The path to the build context.
+      description: Build context used by the OpenShift binary build.
       default: "."
   workspaces:
     - name: shared-data
-      description: |
-        This workspace contains the cloned repo files, so they can be read by the
-        next task.
-    - name: gitops-shared-data
-      description: |
-        This workspace contains the cloned repo files, so they can be read by the
-        next task for gitops.
-    - name: dockerconfig
-      description: |
-        This workspace is used to mount Docker config secret to authenticate with registry.
-
+      description: Workspace containing the cloned application source.
   tasks:
-    # Fetch the source code from the git repository.
     - name: fetch-source
       taskRef:
         name: git-clone
@@ -68,56 +41,37 @@ spec:
         - name: source
           workspace: shared-data
 
-    # Builds the image using Kaniko.
     - name: build-image
-      taskRef:
-        name: kaniko
       runAfter:
         - get-git-sha
+      taskRef:
+        name: build-openshift-image
       workspaces:
         - name: source
           workspace: shared-data
-        - name: dockerconfig
-          workspace: dockerconfig
       params:
-        - name: IMAGE
-          value: "docker.io/$(params.image):$(tasks.get-git-sha.results.commit-sha)"
-        - name: DOCKERFILE
-          value: "$(params.dockerfile)"
+        - name: NAMESPACE
+          value: "hello-pipeline"
+        - name: BUILD_CONFIG
+          value: "hello-build"
+        - name: IMAGE_STREAM
+          value: "hello"
+        - name: IMAGE_TAG
+          value: "$(tasks.get-git-sha.results.commit-sha)"
         - name: CONTEXT
           value: "$(params.context)"
 
-    # Updates the image in the kustomization.yaml file.
-    - name: update-commit-mainfest
+    - name: deploy-to-dev
       runAfter:
         - build-image
       taskRef:
-        name: update-commit-mainfest
-      workspaces:
-        - name: source-gitops
-          workspace: gitops-shared-data
+        name: deploy-openshift
       params:
-        - name: GIT_REPO_GITOPS
-          value: $(params.git-repo-gitops)
-        - name: GIT_BRANCH
-          value: "main"
-        - name: GIT_USER_NAME
-          value: "Pipeline Bot"
-        - name: GIT_USER_EMAIL
-          value: "pipeline@tekton.com"
-        - name: IMAGE
-          value: "$(params.image)"
-        - name: DIGEST
-          value: "$(tasks.get-git-sha.results.commit-sha)"
-        - name: KUSTOMIZE_PATH
-          value: "gitops"
-
-      # Aplica os manifests no OpenShift (ambiente DEV)
-    # - name: deploy-to-dev
-    #   taskRef:
-    #     name: deploy-openshift
-    #   runAfter:
-    #     - update-commit-mainfest
-    #   workspaces:
-    #     - name: manifests
-    #       workspace: gitops-shared-data
+        - name: NAMESPACE
+          value: "hello-pipeline"
+        - name: APP_NAME
+          value: "hello"
+        - name: IMAGE_REF
+          value: "$(tasks.build-image.results.IMAGE_DIGEST)"
+        - name: CONTAINER_PORT
+          value: "8080"

@@ -1,31 +1,91 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: deploy-openshift
   namespace: hello-pipeline
 spec:
-  description: "Aplica os manifests diretamente no OpenShift após atualizar o repositório GitOps"
-  workspaces:
-    - name: manifests
-      description: "Workspace contendo os manifests do GitOps"
+  description: Create or update the application deployment directly in OpenShift.
+  params:
+    - name: NAMESPACE
+      type: string
+      default: hello-pipeline
+    - name: APP_NAME
+      type: string
+      default: hello
+    - name: IMAGE_REF
+      type: string
+      description: Immutable image reference to deploy.
+    - name: CONTAINER_PORT
+      type: string
+      default: "8080"
   steps:
-    # - name: debug-workspace
-    #   image: alpine
-    #   script: |
-    #     #!/bin/sh
-    #     echo "📁 Diretório atual:"
-    #     pwd
-    #     echo "📂 Listando /workspace:"
-    #     ls -la /workspace
-    #     echo "📂 Listando /workspace/manifests:"
-    #     ls -la /workspace/manifests
-    #     echo "📂 Listando tudo com tree:"
-    #     apk add --no-cache tree
-    #     tree /workspace
-
-    - name: oc-apply
+    - name: deploy-to-openshift
       image: quay.io/openshift/origin-cli:latest
+      env:
+        - name: HOME
+          value: /tekton/home
+        - name: KUBECONFIG
+          value: /tekton/home/.kube/config
       script: |
         #!/bin/sh
-        echo "Deploying app to OpenShift (DEV) from updated GitOps repo..."
-        oc apply -k /workspace/manifests/repo/gitops/
+        set -eu
+
+        mkdir -p "$HOME/.kube"
+
+        NAMESPACE="$(params.NAMESPACE)"
+        APP_NAME="$(params.APP_NAME)"
+        IMAGE_REF="$(params.IMAGE_REF)"
+        CONTAINER_PORT="$(params.CONTAINER_PORT)"
+
+        oc login           --token="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"           --server=https://kubernetes.default.svc           --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt >/dev/null
+
+        cat <<EOF | oc apply -n "$NAMESPACE" -f -
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: ${APP_NAME}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: ${APP_NAME}
+          template:
+            metadata:
+              labels:
+                app: ${APP_NAME}
+            spec:
+              containers:
+                - name: ${APP_NAME}
+                  image: ${IMAGE_REF}
+                  ports:
+                    - containerPort: ${CONTAINER_PORT}
+        EOF
+
+        cat <<EOF | oc apply -n "$NAMESPACE" -f -
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: ${APP_NAME}
+        spec:
+          selector:
+            app: ${APP_NAME}
+          ports:
+            - name: http
+              port: ${CONTAINER_PORT}
+              targetPort: ${CONTAINER_PORT}
+        EOF
+
+        if ! oc get route "${APP_NAME}" -n "$NAMESPACE" >/dev/null 2>&1; then
+          oc expose service/"${APP_NAME}" -n "$NAMESPACE" --name="${APP_NAME}" --port=http
+        fi
+
+        oc rollout status deployment/"${APP_NAME}" -n "$NAMESPACE" --timeout=10m
+
+        for i in $(seq 1 30); do
+          if curl -fsS --connect-timeout 5 --max-time 10 "http://${APP_NAME}:${CONTAINER_PORT}/" >/dev/null; then
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "Smoke test failed after waiting for service readiness" >&2
+        exit 1

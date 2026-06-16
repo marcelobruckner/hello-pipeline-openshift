@@ -53,7 +53,7 @@ spec:
       envFrom:
         - secretRef:
             name: github-token
-      workingDir: $(workspaces.source-gitops.path)
+      workingDir: $(workspaces.source-gitops.path)/repo/gitops
       script: |
         #!/bin/sh
         set -e
@@ -81,12 +81,7 @@ spec:
 
         # ls -la
 
-        if [ -d "repo" ]; then
-          echo "🧹 Diretório 'repo' já existe. Removendo..."
-          rm -rf repo
-        fi
-
-        git clone $(params.GIT_REPO_GITOPS) -b $(params.GIT_BRANCH) --single-branch --depth 1 repo
+        git clone $(params.GIT_REPO_GITOPS) -b $(params.GIT_BRANCH) --single-branch --depth 1 repo/gitops
 
     - name: update-manifest-with-kustomize
       image: registry.k8s.io/kustomize/kustomize:v5.0.0
@@ -148,7 +143,7 @@ spec:
           exit 1
         fi
 
-        cd $(workspaces.source-gitops.path)/repo
+        cd $(workspaces.source-gitops.path)/repo/gitops
 
         echo "📂 Diretório após cd: $(pwd)"
 
