@@ -1,55 +1,85 @@
 # Hello Pipeline OpenShift
 
-This project provides a simple CI/CD pipeline for OpenShift with a production-style flow: clone the app, build an immutable image in OpenShift, and deploy it directly to the cluster. GitOps is intentionally deferred to a later phase.
+Este repositório mantém uma pipeline simples de CI/CD para OpenShift usando Tekton. O fluxo atual clona a aplicação, extrai o SHA do commit, constrói uma imagem dentro do OpenShift, faz deploy direto no cluster por digest imutável e valida o resultado com rollout e smoke test.
 
-## Portfolio Focus
+GitOps e integração por webhook foram preservados no repositório, mas estão intencionalmente fora do caminho ativo desta fase.
 
-This repository demonstrates hands-on OpenShift delivery automation with Tekton. It is useful as a portfolio project because it shows a complete deployment path instead of isolated YAML examples: source checkout, Git SHA extraction, image build, immutable deployment by digest, rollout validation, and smoke testing.
+## Objetivo
 
-## Repository Layout
+Demonstrar uma entrega automatizada ponta a ponta no OpenShift, com foco em um fluxo pequeno, validável e adequado para OpenShift Local / CRC:
 
-- **pipeline/**: Tekton pipeline and task manifests.
-- **run/**: A manual `PipelineRun` example for the current flow.
-- **webhook/**: Kept for the future GitOps/webhook phase.
-- **README.md**: Project overview and setup instructions.
+1. clonar o repositório da aplicação;
+2. identificar o commit usado no build;
+3. construir a imagem com `BuildConfig` e `ImageStream`;
+4. publicar a imagem por digest imutável;
+5. atualizar `Deployment`, `Service` e `Route`;
+6. validar o rollout e o endpoint da aplicação.
 
-## Current Flow
+## Por que este projeto existe
 
-1. Clone the application repository.
-2. Extract the short Git SHA from the source tree.
-3. Build an image with OpenShift binary build and tag it in the internal registry.
-4. Deploy the image by immutable digest to OpenShift.
-5. Run a smoke test against the route.
+Este é um projeto de portfólio e laboratório prático de entrega em OpenShift. Ele mostra mais do que manifests isolados: o repositório contém o fluxo de checkout, extração de SHA, build, deploy, validação operacional e execução manual da pipeline.
 
-## Technologies
+## Tecnologias
 
-- **OpenShift**
-- **Tekton Pipelines**
-- **OpenShift Builds / ImageStreams**
-- **OpenShift Routes**
+- OpenShift
+- OpenShift Local / CRC
+- Tekton Pipelines
+- OpenShift Builds
+- ImageStreams
+- Routes
 
-## What this demonstrates
+## Estrutura do Repositório
 
-- Pipeline design for a Java application delivery flow.
-- Separation between reusable task manifests and manual `PipelineRun` examples.
-- Immutable image promotion using image digest instead of mutable tags.
-- Basic operational validation with rollout checks and smoke tests.
-- Local cluster experimentation with OpenShift Local / CRC.
+- `pipeline/`: manifests da pipeline, tasks, RBAC, PVC, `BuildConfig` e `ImageStream`.
+- `run/`: exemplo de `PipelineRun` manual para o fluxo atual.
+- `webhook/`: manifests mantidos para a fase futura de webhook/GitOps.
+- `CONTEXTO.md`: resumo operacional do estado atual do projeto.
+- `install-local.sh`: script de instalação dos recursos ativos no namespace.
 
-## OpenShift Local / CRC
+## Fluxo Ativo
 
-- Use the `hello-pipeline` namespace.
-- The app is deployed directly in OpenShift for the current phase.
-- The deployment task waits for rollout and then runs a smoke test against the exposed route.
-- GitOps and GitHub webhook integration will be reintroduced later, after this base flow is stable.
+O caminho ativo da pipeline é:
 
-## Prerequisites
+```text
+fetch-source -> get-git-sha -> build-image -> deploy-to-dev
+```
 
-- An OpenShift cluster or OpenShift Local / CRC.
-- Tekton Pipelines installed.
-- Access to the GitHub repository that contains the application source.
+Etapas:
 
-## Install
+1. `fetch-source` clona o repositório da aplicação.
+2. `get-git-sha` extrai o SHA curto do commit.
+3. `build-image` dispara um build binário do OpenShift e publica a imagem no `ImageStream`.
+4. `deploy-to-dev` aplica ou atualiza os recursos da aplicação no OpenShift.
+5. A task de deploy aguarda o rollout e executa um smoke test via `curl`.
+
+## Pré-requisitos
+
+- Cluster OpenShift ou OpenShift Local / CRC.
+- OpenShift Pipelines instalado.
+- CLI `oc` autenticada no cluster.
+- Acesso ao repositório da aplicação configurado na pipeline.
+
+Por padrão, a pipeline usa:
+
+```text
+https://github.com/marcelobruckner/hello-app
+```
+
+## Instalação Local
+
+O caminho recomendado para instalar os recursos ativos é usar o script:
+
+```bash
+./install-local.sh
+```
+
+Ele cria ou seleciona o namespace `hello-pipeline` e aplica os manifests necessários para a fase atual.
+
+Observação: o namespace padrão do fluxo atual é `hello-pipeline`. Os manifests ainda usam esse namespace em campos `metadata.namespace` e parâmetros internos, então a execução em outro namespace exige revisar os YAMLs antes de aplicar.
+
+## Instalação Manual
+
+Se preferir aplicar os manifests manualmente:
 
 ```bash
 oc new-project hello-pipeline
@@ -63,27 +93,59 @@ oc apply -f pipeline/12-buildconfig.yaml
 oc apply -f pipeline/13-build-openshift-image.yaml
 oc apply -f pipeline/08-deploy-openshift.yaml
 oc apply -f pipeline/03-pipeline.yaml
-oc apply -f run/05-run.yaml
 ```
 
-## Manual Run
+## Executar a Pipeline
+
+Crie um `PipelineRun` manual:
 
 ```bash
 oc create -f run/05-run.yaml -n hello-pipeline
 ```
 
-Then watch the run with:
+Acompanhe a execução:
 
 ```bash
 oc get pipelinerun,taskrun,pod,build -n hello-pipeline
 ```
 
-## Notes
+Para ver detalhes de uma execução específica:
 
-- The application is deployed by immutable digest, not by a mutable tag.
-- The deploy task validates rollout and performs a smoke test against the route.
-- The GitOps task and webhook manifests remain in the repository for the next phase, but they are not part of the active pipeline.
+```bash
+oc describe pipelinerun <nome-do-pipelinerun> -n hello-pipeline
+oc get pod -n hello-pipeline
+```
 
-## License
+## Validação
+
+Ao final da pipeline, a aplicação deve estar publicada por `Deployment`, `Service` e `Route`.
+
+Comandos úteis:
+
+```bash
+oc get deployment,svc,route -n hello-pipeline
+oc rollout status deployment/hello -n hello-pipeline
+oc get route hello -n hello-pipeline
+```
+
+A task `deploy-openshift` também faz um smoke test interno contra:
+
+```text
+http://hello:8080/
+```
+
+## Notas Operacionais
+
+- A imagem é implantada por digest imutável, não por tag mutável.
+- O build usa recursos nativos do OpenShift, não Docker Hub.
+- O fluxo atual não depende de workspace GitOps.
+- Os manifests de GitOps e webhook permanecem no repositório para evolução futura.
+- Em OpenShift Local / CRC, se pods de workspace não agendarem, verifique a configuração `coschedule` do OpenShift Pipelines.
+
+## Fase Futura
+
+A próxima fase pode reintroduzir GitOps e webhook em cima do fluxo atual já validado. Os arquivos relacionados continuam no repositório, mas não devem ser considerados parte da pipeline ativa até essa evolução.
+
+## Licença
 
 GPL-3.0
