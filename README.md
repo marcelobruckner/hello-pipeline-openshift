@@ -2,6 +2,10 @@
 
 This project provides a simple CI/CD pipeline for OpenShift with a production-style flow: clone the app, build an immutable image in OpenShift, and deploy it directly to the cluster. GitOps is intentionally deferred to a later phase.
 
+## Portfolio Focus
+
+This repository demonstrates hands-on OpenShift delivery automation with Tekton. It is useful as a portfolio project because it shows a complete deployment path instead of isolated YAML examples: source checkout, Git SHA extraction, image build, immutable deployment by digest, rollout validation, and smoke testing.
+
 ## Repository Layout
 
 - **pipeline/**: Tekton pipeline and task manifests.
@@ -23,6 +27,14 @@ This project provides a simple CI/CD pipeline for OpenShift with a production-st
 - **Tekton Pipelines**
 - **OpenShift Builds / ImageStreams**
 - **OpenShift Routes**
+
+## What this demonstrates
+
+- Pipeline design for a Java application delivery flow.
+- Separation between reusable task manifests and manual `PipelineRun` examples.
+- Immutable image promotion using image digest instead of mutable tags.
+- Basic operational validation with rollout checks and smoke tests.
+- Local cluster experimentation with OpenShift Local / CRC.
 
 ## OpenShift Local / CRC
 
